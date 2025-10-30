@@ -64,13 +64,19 @@ if __name__ == '__main__':
 
     model = CIFAR10Classifier()
 
-    transform = transforms.Compose([transforms.ToTensor(),
+    train_transform = transforms.Compose([
+                                    transforms.RandomHorizontalFlip(),
+                                    transforms.RandomRotation(10),
+                                    transforms.ToTensor(),
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-    train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    val_transform = transforms.Compose([transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+    train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=train_transform)
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 
-    val_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+    val_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=val_transform)
     val_loader = DataLoader(val_dataset, batch_size=64)
 
     # How to add TensorBoard support

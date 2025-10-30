@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -144,7 +145,7 @@ if __name__ == '__main__':
 
             # Make the images as grid
             generated_images = make_grid(generated_images.view(-1, 1, 28, 28), nrow=8, normalize=True)
-
+            os.makedirs('./results', exist_ok=True)
             # Save the generated torch tensor models to disk
             save_image(generated_images, f'./results/gen_img{epoch}.png')
 
