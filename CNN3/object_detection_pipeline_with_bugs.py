@@ -32,7 +32,7 @@ def seed_everything(seed: int) -> None:
 
 def collate_fn(batch):
     # batch: List[(image, target)]
-    images, targets, _ = zip(*batch)
+    images, targets = zip(*batch) #mihzad: bug3, unpack 3 elems instead of 2
     return list(images), list(targets)
 
 
@@ -59,7 +59,9 @@ class ArTaxOrVoTTDataset(Dataset):
         samples: List[Sample],
         class_to_idx: Dict[str, int],
         train: bool = True,
-        hflip_p: float = 0.5,
+        hflip_p: float = 0.5, #mihzad: bug9, horizontal flip probability mentioned,
+        #but vertical flip was applied in the code. Vertical flip remained untouched,
+        #bcs context (ArTaxOr) finds it pretty useful.
     ):
         self.samples = samples
         self.class_to_idx = class_to_idx
@@ -85,14 +87,16 @@ class ArTaxOrVoTTDataset(Dataset):
             width = float(bb["width"])
             height = float(bb["height"])
             x1, y1 = left, top
-            x2, y2 = left + height, top + width
+            x2, y2 = left + width, top + height
+            #x2, y2 = left + height, top + width
+            #mihzad: bug1, width and height were swapped, causing wrong box coordinates
 
             tag_list = reg.get("tags", []) or []
             label_name = tag_list[0] if len(tag_list) > 0 else fallback_label
             if label_name not in self.class_to_idx:
                 label_name = fallback_label
 
-            boxes.append([x1, y2, x2, y1])
+            boxes.append([x1, y1, x2, y2]) #mihzad: bug2, y1 y2 swapped
             labels.append(self.class_to_idx[label_name])
 
         if len(boxes) == 0:
@@ -108,7 +112,7 @@ class ArTaxOrVoTTDataset(Dataset):
         img_path = s.image_path.parent / img_name
 
         img = Image.open(img_path).convert("RGB")
-        h, w = img.size
+        w, h = img.size #mihzad: bug6, PIL images have size (width, height), not (height, width)
 
         boxes, labels = self._read_target(s.ann_path, fallback_label=s.order_name)
 
@@ -171,7 +175,8 @@ class ArTaxOrDataModule(pl.LightningDataModule):
             if not ann_dir.exists():
                 continue
             for ann_path in ann_dir.rglob("*.json"):
-                samples.append(Sample(image_path=order_dir / "dummy.jpg", ann_path=ann_path, order_name=order))
+                #mihzad: bug4, dummy.jpg
+                samples.append(Sample(image_path=order_dir / f"{ann_path.stem}.jpg", ann_path=ann_path, order_name=order))
         if not samples:
             raise FileNotFoundError(f"No JSON annotations found under {artaxor_root}")
         return samples
@@ -180,7 +185,8 @@ class ArTaxOrDataModule(pl.LightningDataModule):
         artaxor_root = self.data_dir / "ArTaxOr"
         if not artaxor_root.exists():
             # Sometimes users point directly at ArTaxOr
-            if (self.data_dir / "annotation").exists():
+            #mihzad: bug5, "annotation" doesnt exist neither in ArTaxOr nor in the root
+            if (self.data_dir / "annotation").exists(): 
                 artaxor_root = self.data_dir
             else:
                 raise FileNotFoundError(f"Expected ArTaxOr folder under {self.data_dir}")
@@ -230,7 +236,7 @@ class FasterRCNNLit(pl.LightningModule):
     def __init__(
         self,
         num_classes: int,
-        lr: float = 1e-6,
+        lr: float = 1e-3, #mihzad: bug7, 1e-6 is too low
         weight_decay: float = 1e-4,
     ):
         super().__init__()
@@ -274,18 +280,22 @@ class FasterRCNNLit(pl.LightningModule):
     def configure_optimizers(self):
         params = [p for p in self.model.parameters() if p.requires_grad]
         opt = torch.optim.AdamW(params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
-        sch = torch.optim.lr_scheduler.StepLR(opt, step_size=5, gamma=0.01)
+        sch = torch.optim.lr_scheduler.StepLR(opt, step_size=5, gamma=0.9) 
+        #mihzad: bug8, gamma, which is multiplicative, was set too low, 0.01.
         return {"optimizer": opt, "lr_scheduler": sch}
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, required=True, help="Path containing ArTaxOr/...")
+    parser.add_argument("--data_dir", type=str,
+                         default="D:\\VS_Code_Solutions\\VisualRecognition_Labs\\CNN3",
+                           help="Path containing ArTaxOr/...")
+    #parser.add_argument("--data_dir", type=str, required=True, help="Path containing ArTaxOr/...")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--val_split", type=float, default=0.1)
     parser.add_argument("--max_epochs", type=int, default=20)
-    parser.add_argument("--lr", type=float, default=1e-6)
+    parser.add_argument("--lr", type=float, default=1e-3) #mihzad: bug7, 1e-6 is too low
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -308,7 +318,7 @@ def main():
 
     trainer = pl.Trainer(
         max_epochs=args.max_epochs,
-        accelerator="auto",
+        accelerator="cpu",
         devices="auto",
         callbacks=[ckpt, lrmon],
         log_every_n_steps=20

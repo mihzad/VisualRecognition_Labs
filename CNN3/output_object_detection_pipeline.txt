@@ -1,0 +1,31 @@
+It just works. I am unable to run 2 epochs, because estimated time is tens of hours.
+But it starts successfully, and pipeline seems to work.
+
+
+
+D:\Python\python.exe d:/VS_Code_Solutions/VisualRecognition_Labs/CNN3/object_detection_pipeline_with_bugs.py
+GPU available: True (cuda), used: False
+TPU available: False, using: 0 TPU cores
+D:\Python\Lib\site-packages\lightning\pytorch\trainer\setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+┏━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━┓
+┃   ┃ Name       ┃ Type                 ┃ Params ┃ Mode  ┃ FLOPs ┃
+┡━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━┩
+│ 0 │ model      │ FasterRCNN           │ 19.0 M │ train │     0 │
+│ 1 │ map_metric │ MeanAveragePrecision │      0 │ train │     0 │
+└───┴────────────┴──────────────────────┴────────┴───────┴───────┘
+Trainable params: 18.9 M
+Non-trainable params: 58.9 K
+Total params: 19.0 M
+Total estimated model params size (MB): 75
+Modules in train mode: 281
+Modules in eval mode: 0
+Total FLOPs: 0
+D:\Python\Lib\site-packages\lightning\pytorch\trainer\connectors\data_connector.py:429:    
+Consider setting `persistent_workers=True` in 'val_dataloader' to speed up the dataloader  
+worker initialization.
+D:\Python\Lib\site-packages\lightning\pytorch\trainer\connectors\data_connector.py:429:    
+Consider setting `persistent_workers=True` in 'train_dataloader' to speed up the dataloader
+worker initialization.
+Epoch 0/19 ━━━━━━━━━━━━━━━━━━━━━━ 0/3460 0:00:00 • -:--:-- 0.00it/s v_num: 7.000 val/map:  
+                                                                    0.001 val/map_50: 0.003
