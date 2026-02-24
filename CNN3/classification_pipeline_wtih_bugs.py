@@ -15,7 +15,8 @@ class ResidualBlock(nn.Module):
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, padding=1, bias=False)
+        #fixed bug 1, shape mismatch - through padding=0.
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False) 
         self.bn2 = nn.BatchNorm2d(out_channels)
 
         # If input and output channels are different, adjust the shortcut connection
@@ -39,7 +40,7 @@ class ResidualBlock(nn.Module):
         x = self.bn2(x)
 
         # Add the shortcut (residual connection)
-        x += shortcut
+        x += shortcut #mihzad: bug1, shape mismatch between x and shortcut
         x = self.relu(x)
 
         return x
@@ -55,8 +56,12 @@ class ResNet(nn.Module):
         self.layer1 = ResidualBlock(64, 64)
         self.layer2 = ResidualBlock(64, 128, stride=2)
 
-        # Classifier
-        self.fc = nn.Linear(128 * 8 * 8, num_classes)  # Adjust for 32x32 image size
+        # Classifier 
+        #mihzad: bug2, we need to adjust the input dimension of the FC layer
+        #  to match the output of the last residual block. input size: 32768, not 8192.
+        # used avg pooling to reduce param count.
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(128, num_classes)  # Adjust for 32x32 image size
 
     def forward(self, x):
         x = self.conv1(x)
@@ -66,6 +71,7 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
 
+        x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
 
@@ -76,9 +82,10 @@ def train(model, trainloader, optimizer, criterion, device, accuracy):
     model.train()
     running_loss = 0.0
 
-    log_period = 100
+    log_period = 46 #mihzad: bug 3, 46 divides 782, 100 - not.
     # log_period = 1 # Overfit on one batch
 
+    #mihzad: print(len(trainloader)) = 782
     for i, (inputs, labels) in enumerate(trainloader):
         inputs, labels = inputs.to(device), labels.to(device)
 
@@ -99,6 +106,8 @@ def train(model, trainloader, optimizer, criterion, device, accuracy):
             running_loss = 0.0
 
             accuracy.reset()
+        #mihzad: bug 3. log_period = 100, len(dataloader) = 782, so we log 7 times per epoch, and the last log is
+        #  at batch 700, not 782. We can adjust log_period to 46, bcs 46*17=782 and we dont leave batches onto next epoch.
 
         # break # Overfit on one batch
 
@@ -110,7 +119,8 @@ def evaluate(model, testloader, device):
         for inputs, labels in testloader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(outputs, 1) #mihzad: bug 9, use outputs.data is deprecated, 
+            #inside torch.no_grad() we can just use outputs.
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
@@ -123,6 +133,11 @@ if __name__ == '__main__':
     # Transformations for CIFAR-10 dataset
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
+        #mihzad: bug 10. too few augmentations. i`ll add image rotation.
+        transforms.Pad(4, padding_mode="edge"),
+        transforms.RandomRotation(15),
+        transforms.CenterCrop(32),
+
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.4915, 0.4822, 0.4466), (0.2463, 0.2428, 0.2607)),
@@ -130,7 +145,9 @@ if __name__ == '__main__':
 
     transform_test = transforms.Compose([
         transforms.RandomHorizontalFlip(),
-        transforms.ToTensor()
+        transforms.ToTensor(),
+        transforms.Normalize((0.4915, 0.4822, 0.4466), (0.2463, 0.2428, 0.2607)),
+        #mihzad: bug 8, we need to normalize test data as well.
     ])
 
     # Load CIFAR-10 dataset
@@ -138,7 +155,7 @@ if __name__ == '__main__':
     test_dataset = torchvision.datasets.CIFAR10(root='../data', train=False, download=True, transform=transform_test)
 
     # Load CIFAR10 train and test datasets
-    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=False)
+    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True) #mihzad: bug 6: shuffle = False on training data
     testloader = torch.utils.data.DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     # Create the ResNet model
@@ -150,12 +167,16 @@ if __name__ == '__main__':
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-6)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3) #bug 4: lr too small
     accuracy = Accuracy()
 
-    for epoch in range(10000):
+    for epoch in range(200): #mihzad: bug 5, too many epochs
         train(model, trainloader, optimizer, criterion, device, accuracy)
-        evaluate(model, testloader, device)
+        if epoch % 5 == 0:
+            evaluate(model, testloader, device) #mihzad: bug 7, we evaluate every epoch, slows down training.
+        #we basically use test as validation. if we wanna use validation,
+        #we need to split train set further to leave test set untouched.
+        
 
     # Task:
     # 1. Overfit on one batch
