@@ -268,6 +268,11 @@ class FasterRCNNLit(pl.LightningModule):
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
         images, targets = batch
+
+        #mihzad: bug10: targets, as list of tensors, were not auto-transfered to gpu (self.device) by lightning.
+        # and all v_MAP metrics were zeroed.
+        targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
+
         preds = self.model(images)
         self.map_metric.update(preds, targets)
 
