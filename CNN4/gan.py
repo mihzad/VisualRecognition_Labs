@@ -90,7 +90,7 @@ def D_train(x, G, D, z_dim, criterion, D_optimizer):
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    batch_size = 128
+    batch_size = 128 #128
 
     # MNIST Dataset
     transform = transforms.Compose([
@@ -106,7 +106,7 @@ if __name__ == '__main__':
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
-    z_dim = 64
+    z_dim = 4 # 64
     mnist_dim = train_dataset.train_data.size(1) * train_dataset.train_data.size(2)
 
     G = Generator(g_input_dim=z_dim, g_output_dim=mnist_dim).to(device)
@@ -116,9 +116,10 @@ if __name__ == '__main__':
     criterion = nn.BCELoss()
 
     # optimizer
-    lr = 0.0002
-    G_optimizer = optim.Adam(G.parameters(), lr=lr)
-    D_optimizer = optim.Adam(D.parameters(), lr=lr)
+    lr_G = 2e-5 #mihzad: decoupled LRs and slow down D
+    lr_D = 2e-6
+    G_optimizer = optim.Adam(G.parameters(), lr=lr_G)
+    D_optimizer = optim.Adam(D.parameters(), lr=lr_D)
 
     n_epoch = 200
     for epoch in range(1, n_epoch + 1):
@@ -127,7 +128,10 @@ if __name__ == '__main__':
             x = x.to(device)
 
             D_losses.append(D_train(x, G, D, z_dim, criterion, D_optimizer))
-            G_losses.append(G_train(G, D, batch_size, z_dim, criterion, G_optimizer))
+            g_starts = 1 if epoch < 5 else 8 #mihzad: start with 1 G update per D update to make D capable,
+            #then increase to 8 to let G catch up and exploit D
+            for _ in range(g_starts): #mihzad: attempt to make G overrun D and exploit it
+                G_losses.append(G_train(G, D, batch_size, z_dim, criterion, G_optimizer))
 
         print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % (
             (epoch), n_epoch, torch.mean(torch.FloatTensor(D_losses)), torch.mean(torch.FloatTensor(G_losses))))

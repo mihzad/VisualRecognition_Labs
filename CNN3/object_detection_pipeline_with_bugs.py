@@ -291,7 +291,7 @@ def main():
                          default="D:\\VS_Code_Solutions\\VisualRecognition_Labs\\CNN3",
                            help="Path containing ArTaxOr/...")
     #parser.add_argument("--data_dir", type=str, required=True, help="Path containing ArTaxOr/...")
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--val_split", type=float, default=0.1)
     parser.add_argument("--max_epochs", type=int, default=20)
@@ -318,7 +318,7 @@ def main():
 
     trainer = pl.Trainer(
         max_epochs=args.max_epochs,
-        accelerator="cpu",
+        accelerator="auto",
         devices="auto",
         callbacks=[ckpt, lrmon],
         log_every_n_steps=20
